@@ -1,0 +1,52 @@
+@prefix ex: <https://example.org/pizza/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Inspired by the classic "Pizza Ontology" patterns (kept intentionally tiny for demo).
+@prefix pizza: <http://www.co-ode.org/ontologies/pizza/pizza.owl#> .
+
+ex: a owl:Ontology ;
+  rdfs:label "Mini pizza example (OWL + restrictions + ABox)" .
+
+pizza:Pizza a owl:Class ; rdfs:label "Pizza" .
+pizza:PizzaTopping a owl:Class ; rdfs:label "Pizza topping" .
+
+pizza:TomatoTopping a owl:Class ;
+  rdfs:label "Tomato topping" ;
+  rdfs:subClassOf pizza:PizzaTopping .
+
+pizza:MozzarellaTopping a owl:Class ;
+  rdfs:label "Mozzarella topping" ;
+  rdfs:subClassOf pizza:PizzaTopping .
+
+pizza:Margherita a owl:Class ;
+  rdfs:label "Margherita" ;
+  rdfs:comment "Classic pizza with tomato and mozzarella (example definition annotation)." ;
+  rdfs:subClassOf pizza:Pizza ;
+  rdfs:subClassOf [
+    a owl:Restriction ;
+    owl:onProperty pizza:hasTopping ;
+    owl:someValuesFrom pizza:TomatoTopping
+  ] ;
+  rdfs:subClassOf [
+    a owl:Restriction ;
+    owl:onProperty pizza:hasTopping ;
+    owl:someValuesFrom pizza:MozzarellaTopping
+  ] .
+
+pizza:hasTopping a owl:ObjectProperty ;
+  rdfs:label "has topping" ;
+  rdfs:domain pizza:Pizza ;
+  rdfs:range pizza:PizzaTopping ;
+  rdfs:comment "Links a pizza to its toppings." .
+
+pizza:hasPrice a owl:DatatypeProperty ;
+  rdfs:label "price" ;
+  rdfs:domain pizza:Pizza ;
+  rdfs:range xsd:decimal .
+
+ex:myDinner a pizza:Margherita ;
+  rdfs:label "Tonight's margherita" ;
+  pizza:hasPrice 11.5 .

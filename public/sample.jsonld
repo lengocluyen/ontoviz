@@ -1,0 +1,62 @@
+{
+  "@context": {
+    "ex": "https://example.org/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "type": "rdf:type",
+    "label": "rdfs:label",
+    "subClassOf": { "@id": "rdfs:subClassOf", "@type": "@id" },
+    "domain": { "@id": "rdfs:domain", "@type": "@id" },
+    "range": { "@id": "rdfs:range", "@type": "@id" },
+    "worksFor": { "@id": "ex:worksFor", "@type": "@id" },
+    "age": { "@id": "ex:age", "@type": "xsd:integer" },
+    "prefLabel": "skos:prefLabel",
+    "onProperty": { "@id": "owl:onProperty", "@type": "@id" },
+    "someValuesFrom": { "@id": "owl:someValuesFrom", "@type": "@id" }
+  },
+  "@graph": [
+    { "@id": "ex:Person", "type": "owl:Class", "label": "Person" },
+    { "@id": "ex:Organization", "type": "owl:Class", "label": "Organization" },
+    {
+      "@id": "ex:worksFor",
+      "type": "owl:ObjectProperty",
+      "label": "works for",
+      "domain": "ex:Person",
+      "range": "ex:Organization"
+    },
+    {
+      "@id": "ex:age",
+      "type": "owl:DatatypeProperty",
+      "label": "age",
+      "domain": "ex:Person",
+      "range": "xsd:integer"
+    },
+    {
+      "@id": "ex:Employee",
+      "type": "owl:Class",
+      "label": "Employee",
+      "subClassOf": [
+        "ex:Person",
+        {
+          "@id": "_:r1",
+          "type": "owl:Restriction",
+          "onProperty": "ex:worksFor",
+          "someValuesFrom": "ex:Organization"
+        }
+      ]
+    },
+    {
+      "@id": "ex:alice",
+      "type": "ex:Employee",
+      "label": "Alice",
+      "worksFor": "ex:acme",
+      "age": 29
+    },
+    { "@id": "ex:acme", "type": "ex:Organization", "label": "ACME Inc." },
+    { "@id": "ex:knowledgeGraph", "type": "skos:Concept", "prefLabel": "Knowledge Graph" }
+  ]
+}
+

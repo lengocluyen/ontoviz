@@ -1,0 +1,17 @@
+@prefix : </base##>.
+@prefix owl: <http://www.w3.org/2002/07/owl#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+
+</base#Animal> a owl:Class; rdfs:label "Animal"@en.
+
+</base#HasType>
+    a owl:DatatypeProperty;
+    rdfs:domain </base#Plants>;
+    rdfs:label "Has Type"@en;
+    rdfs:range </base#tree>.
+</base#Organism> a owl:Class; rdfs:label "Organism"@en.
+
+</base#Plants> a owl:Class; rdfs:label "Plants"@en.
+
+</base#Tree> a owl:Class; rdfs:label "tree"@en.
+

@@ -1,0 +1,58 @@
+@prefix ex: <https://example.org/foaf/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex: a owl:Ontology ;
+  rdfs:label "Mini FOAF example (OWL/RDFS + ABox)" .
+
+foaf:Agent a owl:Class ; rdfs:label "Agent" .
+foaf:Person a owl:Class ; rdfs:label "Person" ; rdfs:subClassOf foaf:Agent .
+foaf:Organization a owl:Class ; rdfs:label "Organization" ; rdfs:subClassOf foaf:Agent .
+foaf:Document a owl:Class ; rdfs:label "Document" .
+
+foaf:name a owl:DatatypeProperty ;
+  rdfs:label "name" ;
+  rdfs:domain foaf:Agent ;
+  rdfs:range xsd:string .
+
+foaf:knows a owl:ObjectProperty ;
+  rdfs:label "knows" ;
+  rdfs:domain foaf:Person ;
+  rdfs:range foaf:Person ;
+  rdfs:comment "A social connection between two persons." .
+
+foaf:homepage a owl:ObjectProperty ;
+  rdfs:label "homepage" ;
+  rdfs:domain foaf:Agent ;
+  rdfs:range foaf:Document .
+
+foaf:member a owl:ObjectProperty ;
+  rdfs:label "member" ;
+  rdfs:domain foaf:Person ;
+  rdfs:range foaf:Organization .
+
+foaf:Person rdfs:subClassOf [
+  a owl:Restriction ;
+  owl:onProperty foaf:knows ;
+  owl:someValuesFrom foaf:Person
+] .
+
+ex:alice a foaf:Person ;
+  foaf:name "Alice" ;
+  foaf:knows ex:bob ;
+  foaf:homepage <https://example.org/~alice/> ;
+  rdfs:label "Alice" .
+
+ex:bob a foaf:Person ;
+  foaf:name "Bob" ;
+  foaf:homepage <https://example.org/~bob/> ;
+  foaf:member ex:acme ;
+  rdfs:label "Bob" .
+
+ex:acme a foaf:Organization ;
+  foaf:name "ACME Inc." ;
+  foaf:homepage <https://example.org/acme/> ;
+  rdfs:label "ACME Inc." .

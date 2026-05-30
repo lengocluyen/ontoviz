@@ -1,0 +1,33 @@
+{
+  "nodes": [
+    {
+      "id": "https://example.org/Person",
+      "label": "Person",
+      "kind": "class",
+      "box": "tbox",
+      "types": ["http://www.w3.org/2002/07/owl#Class"],
+      "incoming": 1,
+      "outgoing": 1
+    },
+    {
+      "id": "https://example.org/alice",
+      "label": "Alice",
+      "kind": "individual",
+      "box": "abox",
+      "types": ["https://example.org/Person"],
+      "incoming": 0,
+      "outgoing": 1
+    }
+  ],
+  "links": [
+    {
+      "id": "e1",
+      "source": "https://example.org/alice",
+      "target": "https://example.org/Person",
+      "predicate": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+      "label": "rdf:type",
+      "box": "abox"
+    }
+  ]
+}
+
