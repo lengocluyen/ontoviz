@@ -13,5 +13,5 @@ import fromKapsule from "react-kapsule";
 import ForceGraphKapsule from "force-graph";
 
 export const ForceGraph2D = fromKapsule(ForceGraphKapsule as any, {
-  methodNames: ["centerAt", "zoom", "d3Force", "refresh", "pauseAnimation", "resumeAnimation"],
+  methodNames: ["centerAt", "zoom", "zoomToFit", "d3Force", "refresh", "pauseAnimation", "resumeAnimation"],
 }) as ComponentType<any>;
