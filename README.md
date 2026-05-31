@@ -1,4 +1,4 @@
-# 3D Ontology Graph
+# Ontology Graph
 
 Web-based 3D explorer + editor for ontologies / knowledge graphs.
 
