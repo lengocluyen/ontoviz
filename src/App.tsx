@@ -636,7 +636,9 @@ export default function App() {
           </button>
 
           <div className="brand">
-            <div className="brandTitle">3D Ontology Graph</div>
+            <div className="brandLogoWrap" title="OntoViz">
+              <img className="brandLogo" src="/ontoviz-logo.png" alt="OntoViz" />
+            </div>
             <div className="brandSub">RDF / OWL / JSON-LD → ABox &amp; TBox in 3D</div>
           </div>
         </div>

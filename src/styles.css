@@ -260,6 +260,29 @@ a {
   letter-spacing: 0.2px;
 }
 
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.brandLogoWrap {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: var(--radius-2);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.brandLogo {
+  height: 30px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
 .brandSub {
   font-size: 12px;
   color: var(--muted);

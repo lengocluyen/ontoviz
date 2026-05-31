@@ -1,4 +1,4 @@
-# 3D Ontology Graph
+# OntoViz
 
 Web-based 3D explorer + editor for ontologies / knowledge graphs.
 

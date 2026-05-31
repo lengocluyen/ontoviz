@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
@@ -52,6 +52,15 @@ const EDGE_COLORS: Record<GraphLink["box"], string> = {
   unknown: "#adb5bd",
 };
 
+const SPRITE_FONT =
+  "600 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif";
+
+// Module-level: no closure — only reads node fields passed as argument.
+function nodeVal(n: any): number {
+  const node = n as GraphNode;
+  return Math.max(1, (node.incoming + node.outgoing) * 2);
+}
+
 export default function GraphView3D(props: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const fgRef = useRef<any>(null);
@@ -62,12 +71,57 @@ export default function GraphView3D(props: Props) {
   const css2dRenderer = useMemo(() => new CSS2DRenderer(), []);
   const extraRenderers = useMemo(() => [css2dRenderer], [css2dRenderer]);
 
-  const graphData = useMemo(() => {
-    return {
+  // Sprite label cache — keyed by "n:<id>" or "l:<id>"; cleared with GPU disposal on data/scale change.
+  const spriteCacheRef = useRef(new Map<string, THREE.Sprite>());
+  // Property rect fill material cache — one material per node ID, reused across renders.
+  const rectMaterialCacheRef = useRef(new Map<string, THREE.MeshPhongMaterial>());
+  // Pending camera-focus target: set immediately, resolved on engine-stop if simulation hasn't placed the node yet.
+  const pendingFocusIdRef = useRef<string | null>(null);
+  // Stable snapshot of graphData for use inside zero-dep callbacks.
+  const graphDataRef = useRef<GraphData>({ nodes: [], links: [] });
+
+  const graphData = useMemo(
+    () => ({
       nodes: props.graphData.nodes.map((n) => ({ ...n })),
       links: props.graphData.links.map((l) => ({ ...l })),
+    }),
+    [props.graphData.links, props.graphData.nodes],
+  );
+
+  // Keep graphDataRef current without triggering re-renders.
+  useEffect(() => {
+    graphDataRef.current = graphData;
+  }, [graphData]);
+
+  // Dispose sprite GPU resources (textures + materials) when graphData or label scale changes.
+  useEffect(() => {
+    const cache = spriteCacheRef.current;
+    for (const sprite of cache.values()) {
+      const mat = sprite.material as THREE.SpriteMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+    }
+    cache.clear();
+  }, [graphData, labelScale]);
+
+  // Dispose property rect materials when the graph structure changes.
+  useEffect(() => {
+    const cache = rectMaterialCacheRef.current;
+    for (const mat of cache.values()) mat.dispose();
+    cache.clear();
+  }, [graphData]);
+
+  // Full GPU cleanup on unmount.
+  useEffect(() => {
+    return () => {
+      for (const sprite of spriteCacheRef.current.values()) {
+        const mat = sprite.material as THREE.SpriteMaterial;
+        mat.map?.dispose();
+        mat.dispose();
+      }
+      for (const mat of rectMaterialCacheRef.current.values()) mat.dispose();
     };
-  }, [props.graphData.links, props.graphData.nodes]);
+  }, []);
 
   const propertyNodesWithDomainOrRange = useMemo(() => {
     const out = new Set<string>();
@@ -82,6 +136,12 @@ export default function GraphView3D(props: Props) {
   const propertyRectGeometry = useMemo(() => new THREE.BoxGeometry(14, 7, 3), []);
   const propertyRectEdges = useMemo(() => new THREE.EdgesGeometry(propertyRectGeometry), [propertyRectGeometry]);
 
+  // Shared border material — color never changes, safe to share across all rect nodes.
+  const propertyRectBorderMaterial = useMemo(
+    () => new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.25 }),
+    [],
+  );
+
   const nodeColor = useMemo(() => {
     return (node: GraphNode) => {
       const baseHex = NODE_COLORS[node.kind] ?? NODE_COLORS.unknown;
@@ -95,9 +155,7 @@ export default function GraphView3D(props: Props) {
         else c.lerp(new THREE.Color("#343a40"), 0.40);
         return `#${c.getHexString()}`;
       }
-      return node.id === props.highlightNodeId
-        ? "#ffffff"
-        : "#2b3042";
+      return node.id === props.highlightNodeId ? "#ffffff" : "#2b3042";
     };
   }, [props.annotationMetaById, props.highlightAnnotations, props.highlightNodeId]);
 
@@ -113,32 +171,49 @@ export default function GraphView3D(props: Props) {
     };
   }, []);
 
-  const labelFactory = useMemo(() => {
-    const cache = new Map<string, THREE.Sprite>();
-
-    return (key: string, text: string, color: string, height: number) => {
-      const cached = cache.get(key);
-      if (cached) return cached;
-
-      const sprite = makeTextSprite(text, {
-        color,
-        font: "600 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif",
-        background: "rgba(0,0,0,0.55)",
-        border: "rgba(255,255,255,0.14)",
-        paddingX: 16,
-        paddingY: 10,
-        radius: 12,
-      });
-      const aspect = Number(sprite.userData?.aspect ?? 3);
-      sprite.scale.set(height * aspect, height, 1);
-      cache.set(key, sprite);
-      return sprite;
-    };
-  }, [graphData, labelScale]);
-
   function isPropertyRectNode(node: GraphNode): boolean {
     return node.kind === "property" && propertyNodesWithDomainOrRange.has(node.id);
   }
+
+  // Stable focus attempt — reads only from refs so it never needs to be recreated.
+  // Returns false when the node's position hasn't been set by the simulation yet.
+  const attemptFocus = useCallback((nodeId: string): boolean => {
+    const node = graphDataRef.current.nodes.find((n) => n.id === nodeId) as any;
+    if (!node) {
+      pendingFocusIdRef.current = null;
+      return true;
+    }
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    const z = node.z ?? 0;
+    const mag = Math.hypot(x, y, z);
+    if (mag < 5) return false; // simulation hasn't placed this node yet
+    pendingFocusIdRef.current = null;
+    const distRatio = 1 + 160 / mag;
+    fgRef.current?.cameraPosition(
+      { x: x * distRatio, y: y * distRatio, z: z * distRatio },
+      node,
+      900,
+    );
+    return true;
+  }, []);
+
+  // Stable engine-stop handler — flushes any pending focus once the simulation settles.
+  const handleEngineStop = useCallback(() => {
+    const nodeId = pendingFocusIdRef.current;
+    if (nodeId) attemptFocus(nodeId);
+  }, [attemptFocus]);
+
+  // Try to focus immediately; if the node isn't positioned yet, leave it in pendingFocusIdRef
+  // so handleEngineStop can resolve it once the simulation finishes.
+  useEffect(() => {
+    if (!props.focusNodeId) {
+      pendingFocusIdRef.current = null;
+      return;
+    }
+    pendingFocusIdRef.current = props.focusNodeId;
+    attemptFocus(props.focusNodeId);
+  }, [props.focusNodeId, graphData.nodes, attemptFocus]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -167,21 +242,29 @@ export default function GraphView3D(props: Props) {
   }, [css2dRenderer, labelRenderer, size.height, size.width]);
 
   useEffect(() => {
-    if (!props.focusNodeId) return;
-    const node = graphData.nodes.find((n) => n.id === props.focusNodeId) as any;
-    if (!node || node.x == null || node.y == null || node.z == null) return;
-    const distance = 160;
-    const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
-    fgRef.current?.cameraPosition(
-      { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
-      node,
-      900,
-    );
-  }, [graphData.nodes, props.focusNodeId]);
-
-  useEffect(() => {
     fgRef.current?.refresh?.();
   }, [labelScale, props.showEdgeLabels, props.showNodeLabels]);
+
+  // Sprite factory backed by a persistent cache. Cache is invalidated (with disposal) via the
+  // useEffect above whenever graphData or labelScale changes.
+  function makeCachedSprite(key: string, text: string, color: string, height: number): THREE.Sprite {
+    const cache = spriteCacheRef.current;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    const sprite = makeTextSprite(text, {
+      color,
+      font: SPRITE_FONT,
+      background: "rgba(0,0,0,0.55)",
+      border: "rgba(255,255,255,0.14)",
+      paddingX: 16,
+      paddingY: 10,
+      radius: 12,
+    });
+    const aspect = Number(sprite.userData?.aspect ?? 3);
+    sprite.scale.set(height * aspect, height, 1);
+    cache.set(key, sprite);
+    return sprite;
+  }
 
   return (
     <div ref={containerRef} className="graphCanvas">
@@ -215,10 +298,12 @@ export default function GraphView3D(props: Props) {
         height={size.height}
         graphData={graphData}
         backgroundColor="rgba(0,0,0,0)"
+        warmupTicks={50}
         extraRenderers={
           labelRenderer === "dom" && (props.showNodeLabels || props.showEdgeLabels) ? extraRenderers : undefined
         }
         nodeColor={nodeColor as any}
+        nodeVal={nodeVal}
         linkColor={linkColor as any}
         linkWidth={(l: any) => (l.box === "tbox" ? 1.8 : 1.3)}
         linkOpacity={0.9}
@@ -233,6 +318,7 @@ export default function GraphView3D(props: Props) {
         linkDirectionalParticleWidth={1.5}
         linkDirectionalParticleColor={arrowColor as any}
         nodeRelSize={4}
+        onEngineStop={handleEngineStop}
         nodeThreeObjectExtend={(n: any) => {
           const node = n as GraphNode;
           if (isPropertyRectNode(node)) return false;
@@ -247,25 +333,26 @@ export default function GraphView3D(props: Props) {
             const group = new THREE.Group();
             group.userData = { kind: "propertyRect" };
 
-            const fillMaterial = new THREE.MeshPhongMaterial({
-              color: nodeColor(node) as any,
-              shininess: 40,
-            });
+            // Reuse cached fill material to avoid GPU allocation on every render.
+            let fillMaterial = rectMaterialCacheRef.current.get(node.id);
+            if (!fillMaterial) {
+              fillMaterial = new THREE.MeshPhongMaterial({
+                color: nodeColor(node) as any,
+                shininess: 40,
+              });
+              rectMaterialCacheRef.current.set(node.id, fillMaterial);
+            } else {
+              fillMaterial.color.set(nodeColor(node) as any);
+            }
+
             const box = new THREE.Mesh(propertyRectGeometry, fillMaterial);
             box.userData = { role: "shape" };
             group.add(box);
 
-            const borderMaterial = new THREE.LineBasicMaterial({
-              color: "#ffffff",
-              transparent: true,
-              opacity: 0.25,
-            });
-            const border = new THREE.LineSegments(propertyRectEdges, borderMaterial);
+            // Shared border material — never changes color.
+            const border = new THREE.LineSegments(propertyRectEdges, propertyRectBorderMaterial);
             border.userData = { role: "outline" };
             group.add(border);
-
-            (group.userData as any).shape = box;
-            (group.userData as any).outline = border;
 
             if (wantsLabel) {
               if (labelRenderer === "dom") {
@@ -279,7 +366,7 @@ export default function GraphView3D(props: Props) {
                 obj.renderOrder = 999;
                 group.add(obj);
               } else {
-                const sprite = labelFactory(`n:${node.id}`, label, "rgba(255,255,255,0.92)", 18 * labelScale);
+                const sprite = makeCachedSprite(`n:${node.id}`, label, "rgba(255,255,255,0.92)", 18 * labelScale);
                 sprite.position.set(0, 7, 0);
                 group.add(sprite);
               }
@@ -301,19 +388,16 @@ export default function GraphView3D(props: Props) {
             return obj;
           }
 
-          const sprite = labelFactory(`n:${node.id}`, label, "rgba(255,255,255,0.92)", 18 * labelScale);
+          const sprite = makeCachedSprite(`n:${node.id}`, label, "rgba(255,255,255,0.92)", 18 * labelScale);
           sprite.position.set(0, 8, 0);
           return sprite;
         }}
         nodePositionUpdate={(obj: any, _coords: any, n: any) => {
           const node = n as GraphNode;
           if (!obj || !isPropertyRectNode(node)) return;
-          const group = obj as any;
-          const shape = group.userData?.shape as THREE.Mesh | undefined;
-          const mat = shape?.material as any;
-          if (mat?.color) {
-            mat.color.set(nodeColor(node) as any);
-          }
+          // Update the cached material's color rather than traversing the group hierarchy.
+          const mat = rectMaterialCacheRef.current.get(node.id);
+          if (mat?.color) mat.color.set(nodeColor(node) as any);
         }}
         linkThreeObjectExtend={Boolean(props.showEdgeLabels)}
         linkThreeObject={
@@ -331,9 +415,7 @@ export default function GraphView3D(props: Props) {
                   obj.renderOrder = 998;
                   return obj;
                 }
-
-                const sprite = labelFactory(`l:${link.id}`, label, "rgba(255,255,255,0.82)", 14 * labelScale);
-                return sprite;
+                return makeCachedSprite(`l:${link.id}`, label, "rgba(255,255,255,0.82)", 14 * labelScale);
               }
             : undefined
         }
