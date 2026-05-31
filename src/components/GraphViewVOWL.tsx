@@ -19,6 +19,7 @@
  *   - other abox     → green thin
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { drawTextPill } from "../lib/canvasText";
 import { ForceGraph2D } from "../lib/forceGraph2D";
 import type { CreateEntityInput } from "../lib/editor";
 import type { GraphLink, GraphNode } from "../lib/graphModel";
@@ -95,6 +96,13 @@ export default function GraphViewVOWL(props: Props) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const graphDataRef = useRef<GraphData>({ nodes: [], links: [] });
   const pendingFocusIdRef = useRef<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(() => {
+    try {
+      return localStorage.getItem("ontoviz:legend:vowl") !== "0";
+    } catch {
+      return true;
+    }
+  });
 
   const graphData = useMemo(
     () => ({
@@ -182,7 +190,7 @@ export default function GraphViewVOWL(props: Props) {
       // Label inside circle (for large enough nodes) or below
       if (props.showNodeLabels) {
         const label = clipText(node.label || node.id, 20);
-        const fontSize = Math.max(7, Math.min(r * 0.55, 13 / globalScale));
+        const fontSize = Math.max(7, Math.min(r * 0.55, Math.min(13, 13 / globalScale)));
         ctx.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;
         ctx.textAlign = "center";
         const textW = ctx.measureText(label).width;
@@ -193,10 +201,16 @@ export default function GraphViewVOWL(props: Props) {
           ctx.fillStyle = colors.text;
           ctx.fillText(label, x, y);
         } else {
-          // Below the node
-          ctx.textBaseline = "top";
-          ctx.fillStyle = "rgba(255,255,255,0.9)";
-          ctx.fillText(label, x, y + r + 3);
+          // Below the node, with a small background pill for readability
+          drawTextPill(ctx, label, x, y + r + 4 + fontSize, {
+            font: `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`,
+            color: "rgba(255,255,255,0.90)",
+            background: "rgba(0,0,0,0.50)",
+            border: "rgba(255,255,255,0.12)",
+            paddingX: 6,
+            paddingY: 3,
+            radius: 12,
+          });
         }
       }
     },
@@ -249,21 +263,47 @@ export default function GraphViewVOWL(props: Props) {
 
       if (props.showEdgeLabels) {
         const label = clipText(link.label, 16);
-        const fontSize = Math.max(7, 9 / globalScale);
-        ctx.font = `${fontSize}px ui-sans-serif, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = style.color;
         const mx = (sx + ex) / 2;
         const my = (sy + ey) / 2;
         const perp = angle - Math.PI / 2;
-        ctx.fillText(label, mx + Math.cos(perp) * 9, my + Math.sin(perp) * 9);
+        const lx = mx + Math.cos(perp) * 10;
+        const ly = my + Math.sin(perp) * 10;
+        const fontSize = Math.max(7, Math.min(12, 9 / globalScale));
+        drawTextPill(ctx, label, lx, ly, {
+          font: `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`,
+          color: "rgba(255,255,255,0.86)",
+          background: "rgba(0,0,0,0.40)",
+          border: style.color,
+          paddingX: 5,
+          paddingY: 3,
+          radius: 10,
+        });
       }
 
       ctx.restore();
     },
     [props.showEdgeLabels],
   );
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ontoviz:legend:vowl", legendOpen ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [legendOpen]);
+
+  const zoomToFit = useCallback(() => {
+    fgRef.current?.zoomToFit?.(650, 70);
+  }, []);
+
+  const zoomBy = useCallback((factor: number) => {
+    const fg = fgRef.current;
+    if (!fg?.zoom) return;
+    const current = fg.zoom();
+    const next = Math.max(0.02, Math.min(20, current * factor));
+    fg.zoom(next, 180);
+  }, []);
 
   return (
     <div ref={containerRef} className="graphCanvas">
@@ -280,20 +320,44 @@ export default function GraphViewVOWL(props: Props) {
         </div>
       ) : null}
 
-      {props.onCreateEntity ? (
-        <div
-          className="graphTools"
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
+      <div
+        className="graphHud"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
+        {props.onCreateEntity ? (
+          <>
+            <GraphCreateMenu
+              enabled={Boolean(props.editingEnabled)}
+              baseIri={props.baseIri ?? ""}
+              onCreateEntity={props.onCreateEntity}
+              autoOpenToken={props.autoOpenCreateMenuToken}
+            />
+            <div className="graphHudDivider" aria-hidden="true" />
+          </>
+        ) : null}
+
+        <button className="iconButton" type="button" onClick={zoomToFit} title="Zoom to fit" aria-label="Zoom to fit">
+          <IconFit />
+        </button>
+        <button className="iconButton" type="button" onClick={() => zoomBy(1.2)} title="Zoom in" aria-label="Zoom in">
+          <IconZoomIn />
+        </button>
+        <button className="iconButton" type="button" onClick={() => zoomBy(1 / 1.2)} title="Zoom out" aria-label="Zoom out">
+          <IconZoomOut />
+        </button>
+        <div className="graphHudDivider" aria-hidden="true" />
+        <button
+          className="iconButton"
+          type="button"
+          onClick={() => setLegendOpen((v) => !v)}
+          title={legendOpen ? "Hide legend" : "Show legend"}
+          aria-label={legendOpen ? "Hide legend" : "Show legend"}
+          aria-pressed={legendOpen ? "true" : "false"}
         >
-          <GraphCreateMenu
-            enabled={Boolean(props.editingEnabled)}
-            baseIri={props.baseIri ?? ""}
-            onCreateEntity={props.onCreateEntity}
-            autoOpenToken={props.autoOpenCreateMenuToken}
-          />
-        </div>
-      ) : null}
+          <IconLegend />
+        </button>
+      </div>
 
       <ForceGraph2D
         ref={fgRef}
@@ -323,22 +387,27 @@ export default function GraphViewVOWL(props: Props) {
         enableNodeDrag
       />
 
-      <div className="vowlLegend">
-        <div className="vowlLegendTitle">VOWL Legend</div>
-        {[
-          { color: "#3b6ecc", label: "Class" },
-          { color: "#f0c539", label: "Individual", border: "#c8960d" },
-          { color: "#9b59b6", label: "Concept" },
-          { color: "#2980b9", label: "Object property" },
-          { color: "#27ae60", label: "Data property" },
-          { color: "#e67e22", label: "Annotation property" },
-        ].map(({ color, label }) => (
-          <div key={label} className="vowlLegendRow">
-            <span className="vowlLegendDot" style={{ background: color }} />
-            <span>{label}</span>
+      {legendOpen ? (
+        <div className="vowlLegend">
+          <div className="vowlLegendTitle">VOWL</div>
+          <div className="legendGrid">
+            {[
+              { color: "#3b6ecc", label: "Class" },
+              { color: "#f0c539", label: "Individual", border: "#c8960d" },
+              { color: "#9b59b6", label: "Concept" },
+              { color: "#2980b9", label: "Object property" },
+              { color: "#27ae60", label: "Data property" },
+              { color: "#e67e22", label: "Annotation property" },
+            ].map(({ color, label }) => (
+              <div key={label} className="vowlLegendRow">
+                <span className="vowlLegendDot" style={{ background: color }} />
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+          <div className="legendHint">Scroll to zoom • Drag to pan • Click to inspect</div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -396,4 +465,50 @@ function drawArrowhead(
 function clipText(text: string, maxLen: number): string {
   const s = text ?? "";
   return s.length <= maxLen ? s : `${s.slice(0, maxLen - 1)}…`;
+}
+
+function IconFit() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3H5a2 2 0 0 0-2 2v4" />
+      <path d="M15 3h4a2 2 0 0 1 2 2v4" />
+      <path d="M9 21H5a2 2 0 0 1-2-2v-4" />
+      <path d="M15 21h4a2 2 0 0 0 2-2v-4" />
+      <path d="M8 8h8v8H8z" opacity="0.5" />
+    </svg>
+  );
+}
+
+function IconZoomIn() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M11 8.5v5" />
+      <path d="M8.5 11h5" />
+    </svg>
+  );
+}
+
+function IconZoomOut() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M8.5 11h5" />
+    </svg>
+  );
+}
+
+function IconLegend() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 6h14" />
+      <path d="M5 12h14" />
+      <path d="M5 18h14" />
+      <circle cx="8" cy="6" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="18" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
 }

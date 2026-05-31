@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { drawTextPill } from "../lib/canvasText";
 import { ForceGraph2D } from "../lib/forceGraph2D";
 import type { CreateEntityInput } from "../lib/editor";
 import type { GraphLink, GraphNode } from "../lib/graphModel";
@@ -118,12 +119,16 @@ export default function GraphView2D(props: Props) {
 
       if (props.showNodeLabels) {
         const label = clipText(node.label || node.id, 24);
-        const fontSize = Math.max(8, 11 / globalScale);
-        ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.fillText(label, x, y + r + 2);
+        const fontSize = Math.max(8, Math.min(13, 11 / globalScale));
+        drawTextPill(ctx, label, x, y + r + 4 + fontSize, {
+          font: `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`,
+          color: "rgba(255,255,255,0.92)",
+          background: "rgba(0,0,0,0.55)",
+          border: "rgba(255,255,255,0.14)",
+          paddingX: 6,
+          paddingY: 3,
+          radius: 12,
+        });
       }
     },
     [props.highlightNodeId, props.showNodeLabels],
@@ -178,21 +183,39 @@ export default function GraphView2D(props: Props) {
       // Edge label
       if (props.showEdgeLabels) {
         const label = clipText(link.label, 18);
-        const fontSize = Math.max(7, 9 / globalScale);
-        ctx.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = color;
         const mx = (sx + tx) / 2;
         const my = (sy + ty) / 2;
         const perp = angle - Math.PI / 2;
-        ctx.fillText(label, mx + Math.cos(perp) * 8, my + Math.sin(perp) * 8);
+        const lx = mx + Math.cos(perp) * 9;
+        const ly = my + Math.sin(perp) * 9;
+        const fontSize = Math.max(7, Math.min(12, 9 / globalScale));
+        drawTextPill(ctx, label, lx, ly, {
+          font: `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`,
+          color: "rgba(255,255,255,0.86)",
+          background: "rgba(0,0,0,0.40)",
+          border: color,
+          paddingX: 5,
+          paddingY: 3,
+          radius: 10,
+        });
       }
 
       ctx.restore();
     },
     [props.showEdgeLabels],
   );
+
+  const zoomToFit = useCallback(() => {
+    fgRef.current?.zoomToFit?.(650, 70);
+  }, []);
+
+  const zoomBy = useCallback((factor: number) => {
+    const fg = fgRef.current;
+    if (!fg?.zoom) return;
+    const current = fg.zoom();
+    const next = Math.max(0.02, Math.min(20, current * factor));
+    fg.zoom(next, 180);
+  }, []);
 
   return (
     <div ref={containerRef} className="graphCanvas">
@@ -209,20 +232,33 @@ export default function GraphView2D(props: Props) {
         </div>
       ) : null}
 
-      {props.onCreateEntity ? (
-        <div
-          className="graphTools"
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-        >
-          <GraphCreateMenu
-            enabled={Boolean(props.editingEnabled)}
-            baseIri={props.baseIri ?? ""}
-            onCreateEntity={props.onCreateEntity}
-            autoOpenToken={props.autoOpenCreateMenuToken}
-          />
-        </div>
-      ) : null}
+      <div
+        className="graphHud"
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
+        {props.onCreateEntity ? (
+          <>
+            <GraphCreateMenu
+              enabled={Boolean(props.editingEnabled)}
+              baseIri={props.baseIri ?? ""}
+              onCreateEntity={props.onCreateEntity}
+              autoOpenToken={props.autoOpenCreateMenuToken}
+            />
+            <div className="graphHudDivider" aria-hidden="true" />
+          </>
+        ) : null}
+
+        <button className="iconButton" type="button" onClick={zoomToFit} title="Zoom to fit" aria-label="Zoom to fit">
+          <IconFit />
+        </button>
+        <button className="iconButton" type="button" onClick={() => zoomBy(1.2)} title="Zoom in" aria-label="Zoom in">
+          <IconZoomIn />
+        </button>
+        <button className="iconButton" type="button" onClick={() => zoomBy(1 / 1.2)} title="Zoom out" aria-label="Zoom out">
+          <IconZoomOut />
+        </button>
+      </div>
 
       <ForceGraph2D
         ref={fgRef}
@@ -251,6 +287,10 @@ export default function GraphView2D(props: Props) {
         d3VelocityDecay={0.25}
         enableNodeDrag
       />
+
+      {props.graphData.nodes.length > 0 ? (
+        <div className="graphHint">Scroll to zoom • Drag to pan • Click to inspect</div>
+      ) : null}
     </div>
   );
 }
@@ -258,4 +298,37 @@ export default function GraphView2D(props: Props) {
 function clipText(text: string, maxLen: number): string {
   const s = text ?? "";
   return s.length <= maxLen ? s : `${s.slice(0, maxLen - 1)}…`;
+}
+
+function IconFit() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3H5a2 2 0 0 0-2 2v4" />
+      <path d="M15 3h4a2 2 0 0 1 2 2v4" />
+      <path d="M9 21H5a2 2 0 0 1-2-2v-4" />
+      <path d="M15 21h4a2 2 0 0 0 2-2v-4" />
+      <path d="M8 8h8v8H8z" opacity="0.5" />
+    </svg>
+  );
+}
+
+function IconZoomIn() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M11 8.5v5" />
+      <path d="M8.5 11h5" />
+    </svg>
+  );
+}
+
+function IconZoomOut() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M21 21l-4.3-4.3" />
+      <path d="M8.5 11h5" />
+    </svg>
+  );
 }

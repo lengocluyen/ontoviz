@@ -594,23 +594,29 @@ a {
 
 /* ── View switcher ─────────────────────────────────────────────────── */
 .viewSwitcher {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.18);
-  flex-shrink: 0;
-  z-index: 20;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(10, 14, 28, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
 }
 
 .viewSwitcherBtn {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 10px;
+  padding: 6px 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font-size: 12px;
@@ -635,22 +641,63 @@ a {
   font-size: 12px;
 }
 
+@media (max-width: 700px) {
+  .viewSwitcherLabel {
+    display: none;
+  }
+
+  .viewSwitcherBtn {
+    padding: 7px 9px;
+  }
+}
+
+/* ── Graph HUD ─────────────────────────────────────────────────────── */
+.graphHud {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(10, 14, 28, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.graphHud .iconButton {
+  width: 34px;
+  height: 34px;
+}
+
+.graphHudDivider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 2px 0;
+}
+
 /* ── VOWL / Graffoo legend ─────────────────────────────────────────── */
 .vowlLegend,
 .graffooLegend {
   position: absolute;
-  bottom: 14px;
-  left: 14px;
-  z-index: 10;
+  bottom: 12px;
+  left: 12px;
+  z-index: 18;
   background: rgba(10, 14, 28, 0.82);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-1);
   padding: 8px 10px;
   pointer-events: none;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-width: min(46vw, 300px);
 }
 
 .vowlLegendTitle {
@@ -662,19 +709,54 @@ a {
   margin-bottom: 2px;
 }
 
+.legendGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
 .vowlLegendRow {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
   color: var(--muted);
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .vowlLegendDot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.legendHint {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.graphHint {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 18;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-1);
+  background: rgba(10, 14, 28, 0.78);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.52);
+  pointer-events: none;
+}
+
+@media (max-width: 700px) {
+  .legendGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .menuDropdownWide {
