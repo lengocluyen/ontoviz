@@ -22,7 +22,7 @@
  *     other              → gray solid,  open-arrow target
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph2D from "react-force-graph";
+import { ForceGraph2D } from "react-force-graph";
 import type { CreateEntityInput } from "../lib/editor";
 import type { GraphNode } from "../lib/graphModel";
 import type { GraffooLink, GraffooModel, GraffooNode } from "../lib/graffooModel";

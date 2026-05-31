@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph2D from "react-force-graph";
+import { ForceGraph2D } from "react-force-graph";
 import type { CreateEntityInput } from "../lib/editor";
 import type { GraphLink, GraphNode } from "../lib/graphModel";
 import GraphCreateMenu from "./GraphCreateMenu";
