@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "rdflib": "^2.2.37",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-force-graph": "^1.48.2",
     "react-force-graph-3d": "^1.27.0",
-    "rdflib": "^2.2.37",
     "three": "^0.160.0"
   },
   "devDependencies": {
@@ -23,4 +24,3 @@
     "vite": "^5.2.0"
   }
 }
-

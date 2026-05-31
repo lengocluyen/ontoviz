@@ -8,6 +8,10 @@ import FileDrop from "./components/FileDrop";
 import EditorCard, { type AddTripleInput } from "./components/EditorCard";
 import UserMenu from "./components/UserMenu";
 import GraphView3D from "./components/GraphView3D";
+import GraphView2D from "./components/GraphView2D";
+import GraphViewVOWL from "./components/GraphViewVOWL";
+import GraphViewGraffoo from "./components/GraphViewGraffoo";
+import ViewSwitcher, { type ViewMode } from "./components/ViewSwitcher";
 import HeaderSearch from "./components/HeaderSearch";
 import OwlEntityEditorCard from "./components/OwlEntityEditorCard";
 import Sidebar from "./components/Sidebar";
@@ -17,6 +21,7 @@ import type { GraphLink, GraphNode, OntologyModel } from "./lib/graphModel";
 import { DEFAULT_BASE_IRI } from "./lib/graphModel";
 import type { CreateEntityInput } from "./lib/editor";
 import { buildOntologyModel, getLocalName, hashString, IRI, isBuiltInIri } from "./lib/ontology";
+import { buildGraffooModel } from "./lib/graffooModel";
 import type { StoreChange } from "./lib/changeLog";
 import { invertChangeKind } from "./lib/changeLog";
 import {
@@ -179,6 +184,7 @@ export default function App() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("details");
   const [isDesktopLayout, setIsDesktopLayout] = useState(() => matchesMediaQuery("(min-width: 1200px)"));
   const [sparqlWorkspaceOpen, setSparqlWorkspaceOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("3d");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -236,6 +242,27 @@ export default function App() {
       links: allowedLinks,
     };
   }, [filters, model.links, model.nodes]);
+
+  const graffooData = useMemo(() => {
+    const gm = buildGraffooModel(model);
+    const nodes = gm.nodes.filter((n) => {
+      if (filters.hideBuiltins && n.iri && isBuiltInIri(n.iri)) return false;
+      if (!filters.showBlankNodes && n.kind === "blank") return false;
+      if (!filters.showRestrictions && n.kind === "restriction") return false;
+      if (!filters.showLiterals && n.kind === "literal") return false;
+      if (!filters.showClasses && n.kind === "class") return false;
+      if (!filters.showIndividuals && n.kind === "individual") return false;
+      if (!filters.showConcepts && n.kind === "concept") return false;
+      if (!filters.showTBox && n.box === "tbox") return false;
+      if (!filters.showABox && n.box === "abox") return false;
+      return true;
+    });
+    const includedIds = new Set(nodes.map((n) => n.id));
+    const links = gm.links.filter(
+      (l) => includedIds.has(String(l.source)) && includedIds.has(String(l.target)),
+    );
+    return { nodes, links };
+  }, [model, filters]);
 
   const selection = useMemo(() => {
     const node = selectedNodeId ? model.nodes.find((n) => n.id === selectedNodeId) ?? null : null;
@@ -635,12 +662,7 @@ export default function App() {
             <IconHamburger />
           </button>
 
-          <div className="brand">
-            <div className="brandLogoWrap" title="OntoViz">
-              <img className="brandLogo" src="/ontoviz-logo.png" alt="OntoViz" />
-            </div>
-            <div className="brandSub">RDF / OWL / JSON-LD → ABox &amp; TBox in 3D</div>
-          </div>
+          <BrandMark />
         </div>
         <div className="topCenter">
           <HeaderSearch
@@ -739,37 +761,103 @@ export default function App() {
         </section>
 
         <section className="graphPane">
-          <GraphView3D
-            graphData={filtered}
-            focusNodeId={focusNodeId}
-            highlightNodeId={selectedNodeId}
-            editingEnabled={Boolean(rdfStore)}
-            baseIri={baseIri}
-            onCreateEntity={createEntity}
-            autoOpenCreateMenuToken={createMenuToken}
-            showNodeLabels={filters.showNodeLabels}
-            showEdgeLabels={filters.showEdgeLabels}
-            labelRenderer={filters.labelRenderer}
-            labelScale={filters.labelScale}
-            showEdgeFlow={filters.showEdgeFlow}
-            highlightAnnotations={filters.highlightAnnotations}
-            annotationMetaById={annotationMetaById}
-            onNodeClick={(node) => {
-              if (!node?.id) return;
-              focusOnNodeId(node.id);
-            }}
-            onLinkClick={(link) => {
-              setSelectedLinkId(link?.id ?? null);
-              setSelectedNodeId(null);
-              setInspectorTab("details");
-              if (link?.id && !showInspector) setShowInspector(true);
-              if (link?.id && matchesMediaQuery("(max-width: 900px)")) setShowSidebar(false);
-            }}
-            onBackgroundClick={() => {
-              setSelectedNodeId(null);
-              setSelectedLinkId(null);
-            }}
-          />
+          <ViewSwitcher value={viewMode} onChange={setViewMode} />
+
+          {viewMode === "3d" ? (
+            <GraphView3D
+              graphData={filtered}
+              focusNodeId={focusNodeId}
+              highlightNodeId={selectedNodeId}
+              editingEnabled={Boolean(rdfStore)}
+              baseIri={baseIri}
+              onCreateEntity={createEntity}
+              autoOpenCreateMenuToken={createMenuToken}
+              showNodeLabels={filters.showNodeLabels}
+              showEdgeLabels={filters.showEdgeLabels}
+              labelRenderer={filters.labelRenderer}
+              labelScale={filters.labelScale}
+              showEdgeFlow={filters.showEdgeFlow}
+              highlightAnnotations={filters.highlightAnnotations}
+              annotationMetaById={annotationMetaById}
+              onNodeClick={(node) => { if (node?.id) focusOnNodeId(node.id); }}
+              onLinkClick={(link) => {
+                setSelectedLinkId(link?.id ?? null);
+                setSelectedNodeId(null);
+                setInspectorTab("details");
+                if (link?.id && !showInspector) setShowInspector(true);
+                if (link?.id && matchesMediaQuery("(max-width: 900px)")) setShowSidebar(false);
+              }}
+              onBackgroundClick={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
+            />
+          ) : viewMode === "2d" ? (
+            <GraphView2D
+              graphData={filtered}
+              focusNodeId={focusNodeId}
+              highlightNodeId={selectedNodeId}
+              editingEnabled={Boolean(rdfStore)}
+              baseIri={baseIri}
+              onCreateEntity={createEntity}
+              autoOpenCreateMenuToken={createMenuToken}
+              showNodeLabels={filters.showNodeLabels}
+              showEdgeLabels={filters.showEdgeLabels}
+              showEdgeFlow={filters.showEdgeFlow}
+              highlightAnnotations={filters.highlightAnnotations}
+              annotationMetaById={annotationMetaById}
+              onNodeClick={(node) => { if (node?.id) focusOnNodeId(node.id); }}
+              onLinkClick={(link) => {
+                setSelectedLinkId(link?.id ?? null);
+                setSelectedNodeId(null);
+                setInspectorTab("details");
+                if (link?.id && !showInspector) setShowInspector(true);
+                if (link?.id && matchesMediaQuery("(max-width: 900px)")) setShowSidebar(false);
+              }}
+              onBackgroundClick={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
+            />
+          ) : viewMode === "vowl" ? (
+            <GraphViewVOWL
+              graphData={filtered}
+              focusNodeId={focusNodeId}
+              highlightNodeId={selectedNodeId}
+              editingEnabled={Boolean(rdfStore)}
+              baseIri={baseIri}
+              onCreateEntity={createEntity}
+              autoOpenCreateMenuToken={createMenuToken}
+              showNodeLabels={filters.showNodeLabels}
+              showEdgeLabels={filters.showEdgeLabels}
+              highlightAnnotations={filters.highlightAnnotations}
+              annotationMetaById={annotationMetaById}
+              onNodeClick={(node) => { if (node?.id) focusOnNodeId(node.id); }}
+              onLinkClick={(link) => {
+                setSelectedLinkId(link?.id ?? null);
+                setSelectedNodeId(null);
+                setInspectorTab("details");
+                if (link?.id && !showInspector) setShowInspector(true);
+                if (link?.id && matchesMediaQuery("(max-width: 900px)")) setShowSidebar(false);
+              }}
+              onBackgroundClick={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
+            />
+          ) : (
+            <GraphViewGraffoo
+              graffooData={graffooData}
+              focusNodeId={focusNodeId}
+              highlightNodeId={selectedNodeId}
+              editingEnabled={Boolean(rdfStore)}
+              baseIri={baseIri}
+              onCreateEntity={createEntity}
+              autoOpenCreateMenuToken={createMenuToken}
+              showNodeLabels={filters.showNodeLabels}
+              showEdgeLabels={filters.showEdgeLabels}
+              onNodeClick={(node) => { if (node?.id) focusOnNodeId(node.id); }}
+              onLinkClick={(link) => {
+                setSelectedLinkId(link?.id ?? null);
+                setSelectedNodeId(null);
+                setInspectorTab("details");
+                if (link?.id && !showInspector) setShowInspector(true);
+                if (link?.id && matchesMediaQuery("(max-width: 900px)")) setShowSidebar(false);
+              }}
+              onBackgroundClick={() => { setSelectedNodeId(null); setSelectedLinkId(null); }}
+            />
+          )}
           {sparqlWorkspaceOpen ? (
             <SparqlWorkspace
               store={rdfStore}
@@ -949,6 +1037,48 @@ export default function App() {
           </section>
         ) : null}
       </main>
+    </div>
+  );
+}
+
+function BrandMark() {
+  return (
+    <div className="brandMark">
+      <div className="brandIcon" aria-hidden="true">
+        <svg viewBox="0 0 36 36" width="36" height="36" fill="none">
+          {/* Edges */}
+          <line x1="18" y1="9" x2="9"  y2="25" stroke="rgba(255,255,255,0.22)" strokeWidth="1.6" strokeLinecap="round" />
+          <line x1="18" y1="9" x2="27" y2="25" stroke="rgba(255,255,255,0.22)" strokeWidth="1.6" strokeLinecap="round" />
+          <line x1="10" y1="25" x2="26" y2="25" stroke="rgba(255,255,255,0.22)" strokeWidth="1.6" strokeLinecap="round" />
+          {/* Arrow tip top→bottom-right */}
+          <polyline points="24.5,22 27,25 23.5,25.8" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          {/* Class node — top, blue */}
+          <circle cx="18" cy="9"  r="4.5" fill="#4dabf7" />
+          <circle cx="18" cy="9"  r="4.5" fill="url(#gTop)" />
+          {/* Individual node — bottom-left, green */}
+          <circle cx="9"  cy="25" r="3.8" fill="#40c057" />
+          {/* Property node — bottom-right, yellow */}
+          <rect x="23.2" y="21.2" width="7.6" height="7.6" rx="1.6" fill="#ffd43b" />
+          {/* Subtle glow on class node */}
+          <circle cx="18" cy="9" r="6.5" fill="url(#glowTop)" />
+          <defs>
+            <radialGradient id="gTop" cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#a5d8ff" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#4dabf7" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="glowTop" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#74c0fc" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#74c0fc" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+        </svg>
+      </div>
+      <div className="brandText">
+        <div className="brandName">
+          <span className="brandNameOnto">Onto</span><span className="brandNameViz">Viz</span>
+        </div>
+        <div className="brandSub">Ontology Explorer &amp; Editor</div>
+      </div>
     </div>
   );
 }

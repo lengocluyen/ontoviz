@@ -255,38 +255,55 @@ a {
   white-space: nowrap;
 }
 
-.brandTitle {
-  font-weight: 650;
-  letter-spacing: 0.2px;
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
 }
 
-.brand {
+.brandIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(77, 171, 247, 0.16) 0%, rgba(11, 16, 32, 0.6) 100%);
+  border: 1px solid rgba(116, 192, 252, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+              0 4px 16px rgba(77, 171, 247, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brandText {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
-.brandLogoWrap {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: var(--radius-2);
-  border: 1px solid rgba(0, 0, 0, 0.10);
-  background: rgba(255, 255, 255, 0.92);
+.brandName {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
-.brandLogo {
-  height: 30px;
-  width: auto;
-  display: block;
-  object-fit: contain;
+.brandNameOnto {
+  color: var(--text);
+}
+
+.brandNameViz {
+  color: #74c0fc;
 }
 
 .brandSub {
-  font-size: 12px;
+  font-size: 10.5px;
   color: var(--muted);
-  margin-top: 2px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .mainArea {
@@ -555,11 +572,14 @@ a {
   overflow: hidden;
   background: rgba(255, 255, 255, 0.03);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .graphCanvas {
   position: relative;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .graphTools {
@@ -570,6 +590,91 @@ a {
   display: flex;
   gap: 8px;
   pointer-events: auto;
+}
+
+/* ── View switcher ─────────────────────────────────────────────────── */
+.viewSwitcher {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.viewSwitcherBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.viewSwitcherBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.viewSwitcherBtn.active {
+  background: rgba(116, 192, 252, 0.14);
+  border-color: rgba(116, 192, 252, 0.35);
+  color: #74c0fc;
+}
+
+.viewSwitcherLabel {
+  font-size: 12px;
+}
+
+/* ── VOWL / Graffoo legend ─────────────────────────────────────────── */
+.vowlLegend,
+.graffooLegend {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 10;
+  background: rgba(10, 14, 28, 0.82);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vowlLegendTitle {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.vowlLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.vowlLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .menuDropdownWide {
