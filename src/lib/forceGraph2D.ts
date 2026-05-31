@@ -8,9 +8,10 @@
 //
 // `force-graph` (2D only) and `react-kapsule` are already in node_modules
 // as transitive deps of `react-force-graph`; we just use them directly.
+import type { ComponentType } from "react";
 import fromKapsule from "react-kapsule";
 import ForceGraphKapsule from "force-graph";
 
 export const ForceGraph2D = fromKapsule(ForceGraphKapsule as any, {
   methodNames: ["centerAt", "zoom", "d3Force", "refresh", "pauseAnimation", "resumeAnimation"],
-});
+}) as ComponentType<any>;
